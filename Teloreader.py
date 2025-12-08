@@ -29,8 +29,8 @@ def parse_arguments():
     )
     parser.add_argument(
         "motif",
-        help="telomeric motif ex = Yeast / TTAGGG",
-    )
+        help="telomeric motif (Yeast | TTAGGG | TTTAGGG | TTAGGGGG | TTTGGG | TTTGGGG | TCAGG | TGACC | TGGAGGA)",
+        )
     parser.add_argument(
         "-threads",
         "-t",
