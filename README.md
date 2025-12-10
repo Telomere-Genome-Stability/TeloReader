@@ -58,13 +58,14 @@ python Teloreader.py <strain> <fastafile> <motifs>
 
 # Outputs
 
-###Directory created: 
-out_teloreader/
+### Directory created: 
+**`out_teloreader/`**
 
-###Files generated:
-merged_output_<strain>_<fastaname>.csv: Tab-separated table of all detected telomeric sequences in the input FASTA.
-merged_output_<strain>_<fastaname>.fasta: FASTA file containing all detected telomeric sequences.
+### Files generated:
+- **`merged_output_<strain>_<fastaname>.tsv`**: Tab-separated table listing all telomeric sequences detected in the input FASTA.
 
+- **`merged_output_<strain>_<fastaname>.fasta`**: FASTA file containing all detected telomeric sequences.
+  
 # Descrption of outpu column tab
 | Argument   | Description                                                |
 |------------|------------------------------------------------------------|
