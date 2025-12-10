@@ -14,24 +14,24 @@ TeloReader identifies sequences ≥16 bp, either at chromosome ends (terminal) o
 
 # Installation
 
-## Clone the repository
+### Clone the repository
 ```bash
 git clone https://github.com/Telomere-Genome-Stability/TeloReader.git
 cd TeloReader
 ```
 
-## Create and activate the environment
+### Create and activate the environment
 ```bash
 conda create -n teloreader python=3.10
 conda activate teloreader
 ```
 
-## Install Python dependencies
+### Install Python dependencies
 ```bash
 conda install -c conda-forge numpy pandas
 ```
 
-## Install SeqKit
+### Install SeqKit
 ```bash
 conda install -c bioconda seqkit
 ```
@@ -57,22 +57,24 @@ python Teloreader.py <strain> <fastafile> <motifs>
 | `-o`, `--out_pwd`          | Output directory.                                                                       | FASTA directory |
 
 # Outputs
-Directory created: out_teloreader/
 
-Files generated:
+###Directory created: 
+out_teloreader/
+
+###Files generated:
 merged_output_<strain>_<fastaname>.csv: Tab-separated table of all detected telomeric sequences in the input FASTA.
 merged_output_<strain>_<fastaname>.fasta: FASTA file containing all detected telomeric sequences.
 
 # Descrption of outpu column tab
 | Argument   | Description                                                |
 |------------|------------------------------------------------------------|
-| strain     | Strain name (label)                                        |
-| name       | Sequence name                                              |
-| N          | Total number of telomeric sequences found in this sequence |
-| type       | C for C-rich motif, G for G-rich                           |
-| len        | Telomere length                                            |
-| start      | Start position of the telomeric sequence                   |
-| end        | End position of the telomeric sequence                     |
-| Loc        | term for terminal telomere, intern for ITS                 |
-| Score_Kmer | Mean k-mer score (motif length = perfect score)            |
-| reads_len  | Total length of the parent sequence                        |
+| `strain`     | Strain name (label)                                        |
+| `name`       | Sequence name                                              |
+| `N`          | Total number of telomeric sequences found in this sequence |
+| `type`       | `C` for C-rich motif, `G` for G-rich                           |
+| `len`        | Telomere length                                            |
+| `start`      | Start position of the telomeric sequence                   |
+| `end`        | End position of the telomeric sequence                     |
+| `Loc`        | `term` for terminal telomere, `intern` for ITS                 |
+| `Score_Kmer` | Mean k-mer score (motif length = perfect score)            |
+| `reads_len`  | Total length of the parent sequence                        |
