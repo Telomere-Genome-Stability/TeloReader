@@ -8,7 +8,6 @@ import time
 import os
 import concurrent.futures
 import subprocess
-import logging
 import re
 
 
@@ -28,8 +27,8 @@ def parse_arguments():
     )
     parser.add_argument(
         "motif",
-        help="telomeric motif (Yeast | TTAGGG | TTTAGGG | TTAGGGGG | TTTGGG | TTTGGGG | TCAGG | TGACC | TGGAGGA)",
-        )
+        help="telomeric motif (possible motifs = Yeast / TTAGGG / TTTAGGG / TTAGG / TTGGG / TTTGGG / TTTGGGG / )",
+    )
     parser.add_argument(
         "-threads",
         "-t",
@@ -107,13 +106,14 @@ def Make_reverse(seq):
     return(rseq)
 
 
-def Fasta_to_Kmertype(fasta,fileKmer,typ):
+def Fasta_to_Kmertype(fasta,fileKmer,typ,mer_size,Tab_score):
     '''
-    Converts a fasta file to an 8-mer score file.
+    Converts a fasta file to an K-mer score file.
 
     :param fasta: path to input fasta file
     :param fileKmer: path to output K-mer score file
     :param typ: type of scoring system ('C' for C-rich or 'G' for G-rich)
+    :param Tab_score: table of K-mer score
     '''
     f=open(fasta,'r')
     fK=open(fileKmer,'w')
@@ -133,7 +133,6 @@ def Fasta_to_Kmertype(fasta,fileKmer,typ):
                 seq=rest+l.strip('\n')
             else:
                 seq=l.strip('\n')
-
             for i in range(len(seq)-(mer_size-1)):
                 mer=seq[i:i+mer_size].upper()
                 if re.fullmatch("[ATGC]+", mer):
@@ -151,7 +150,7 @@ def Fasta_to_Kmertype(fasta,fileKmer,typ):
     fK.close()
 
 
-def Add_Telo(dfTelo,nam,deb,fin,typ,len_read,mean_score):
+def Add_Telo(dfTelo,nam,deb,fin,typ,len_read,mean_score,strain,max_dist_term):
     '''
     Adds a telomere to a telomere DataFrame.
 
@@ -162,6 +161,8 @@ def Add_Telo(dfTelo,nam,deb,fin,typ,len_read,mean_score):
     :param typ: type of telomere ('C' for C-rich or 'G' for G-rich)
     :param len_read: length of read
     :param mean_score: mean 8-mer score of telomere
+    :param strain: strain / label name
+    :param max_dist_term: maximal distance from the extremity to be considered as terminal
     :return: updated DataFrame with new telomere
     '''
     ind=len(dfTelo)
@@ -179,13 +180,16 @@ def Add_Telo(dfTelo,nam,deb,fin,typ,len_read,mean_score):
     dfTelo.at[ind,'reads_len']=len_read
     return(dfTelo)
 
-def Cal_all_mean(score):
+def Cal_all_mean(score,size_window,mer_size,min_mean_window):
     '''
     Calculates mean scores for all windows of given size in a list of scores,
     and returns a list of decisions based on whether the mean score in each
     window is above a given threshold.
 
     :param score: list of integer scores
+    :param size_window: size of the sliding window for the calculation of the score average
+    :param mer_size: size of telomere motif
+    :param min_mean_window: Minimum average score of a telomere window
     :return: list of decisions (0 if mean score is below threshold, 1 if above)
     '''
     mean_score=[]
@@ -199,7 +203,7 @@ def Cal_all_mean(score):
             decision.append(1)
     return(decision)
 
-def Eval_One_Read(dfTelo,nam,seq,typ,score):
+def Eval_One_Read(dfTelo,nam,seq,typ,score,mer_size,size_window,min_mean_window,min_mean_telo,strain,max_dist_term,max_size_gap,min_len):
     '''
     Given a score of a sequencing read, identifies and evaluates telomeric regions.
     Adds the telomeric regions to the data frame dfTelo, with the corresponding read name and type.
@@ -208,7 +212,15 @@ def Eval_One_Read(dfTelo,nam,seq,typ,score):
     :param nam: read name
     :param seq: DNA sequence of the read
     :param typ: telomere type, 'G' Grich and 'C' for Crich
-    :param score: list of 8mer score (in string format) of the sequence
+    :param score: list of Kmer score (in string format) of the sequence
+    :param mer_size: size of telomere motif
+    :param size_window: size of the sliding window for the calculation of the score average
+    :param min_mean_window: minimum average score of a telomere window
+    :param min_mean_telo: minimum average score of a telomere
+    :param strain: strain / label name
+    :param max_dist_term: maximal distance from the extremity to be considered as terminal
+    :param max_size_gap: maximum size of a non telomeric gap in telomere
+    :param min_len : minimum length of a telomere
     :returns dfTelo: the updated Pandas DataFrame with the telomeric regions added
     '''
     #Checks if 7 or 8 is in score, which may indicate the presence of a telomeric repeat.  If this is not the case, the function does not execute the rest of the code.
@@ -216,7 +228,7 @@ def Eval_One_Read(dfTelo,nam,seq,typ,score):
         telo=0 
         i=0
         start_gap=''
-        decision=Cal_all_mean(score)
+        decision=Cal_all_mean(score,size_window,mer_size,min_mean_window)
         if typ == 'G' : # if we search a G-rich telomere, we go through the sequence from the end
             ind_seq=range(len(seq)-1,-1,-1)
             ind_score=range(len(score)-1,-1,-1)
@@ -257,7 +269,7 @@ def Eval_One_Read(dfTelo,nam,seq,typ,score):
                         if len(score_telo)>1 and score_telo[-1]==str(mer_size-1) and score_telo[-2]==str(mer_size):
                             score_telo=score_telo[:-1]
                     if len(score_telo)+mer_size> min_len and score_telo.count(str(mer_size))>=mer_size:
-                        dfTelo = Add_Telo(dfTelo,nam,start,end,typ,len(seq),np.mean([int(k) for k in score_telo]))
+                        dfTelo = Add_Telo(dfTelo,nam,start,end,typ,len(seq),np.mean([int(k) for k in score_telo]),strain,max_dist_term)
                     i=len(score) 
                 elif decision[ind_d[i]] == 1: # if decision is 1, telomeric stretch continues
                     i+=1
@@ -295,7 +307,6 @@ def Eval_One_Read(dfTelo,nam,seq,typ,score):
                         i=ind_seq.index(max(start-1,0))
 
                     else : 
-
                         score_telo = score[start:min(start_gap+size_window-mer_size,len(score))+1]
                         j=min(len(score_telo)-(start_gap-start),len(score_telo))+1
                         while score_telo[-1] not in  [str(mer_size-1),str(mer_size)] or np.mean([int(k) for k in score_telo]) < min_mean_telo :
@@ -312,15 +323,15 @@ def Eval_One_Read(dfTelo,nam,seq,typ,score):
                     start_gap=''
                     # Check if there are at least three scores of 8 in the telomere
                     if len(score_telo)+mer_size> min_len and score_telo.count(str(mer_size))>=mer_size :
-                        dfTelo = Add_Telo(dfTelo,nam,start,end,typ,len(seq),np.mean([int(k) for k in score_telo]))
+                        dfTelo = Add_Telo(dfTelo,nam,start,end,typ,len(seq),np.mean([int(k) for k in score_telo]),strain,max_dist_term)
     return(dfTelo)
 
 def Add_N(dfTelo):
     '''
-    Adds name of read in the dfTelo DataFrame
+    Adds number of telomere by read in the dfTelo DataFrame
 
-    :param dfTelo: DataFrame to add name
-    :return: updated DataFrame with read name of telomere
+    :param dfTelo: DataFrame to add number of telomere by read
+    :return: updated DataFrame with number of telomere by read
     '''
     for i in dfTelo.index:
         dfTelo.at[i,'N']=len(dfTelo[dfTelo['name']==dfTelo.at[i,'name']])
@@ -369,15 +380,23 @@ def Make_Fasta_Telo_Complet_dfTelo(csv,fasta,original_fasta):
     foriginal.close()
     return(csv)
 
-def Find_Telo_on_Kmer(original_fasta,out_fasta,fileCKmer,fileGKmer,out_csv):
+def Find_Telo_on_Kmer(original_fasta,out_fasta,fileCKmer,fileGKmer,out_csv,mer_size,size_window,min_mean_window,min_mean_telo,strain,max_dist_term,max_size_gap,min_len):
     '''
     This function initializes dfTelo DataFrame, and executes the different functions to obtain output results.
 
     :param original_fasta: path of original fasta file with all sequences
     :param out_fasta: path of the new created fasta file with all telomeric regions
-    :param fileC8mer: path of the file created with the function Fasta_to_8mertype with C-rich 8mer scores of given sequences.
-    :param fileG8mer: path of the file created with the function Fasta_to_8mertype with G-rich 8mer scores of given sequences.
+    :param fileCKmer: path of the file created with the function Fasta_to_Kmertype with C-rich Kmer scores of given sequences.
+    :param fileGKmer: path of the file created with the function Fasta_to_Kmertype with G-rich Kmer scores of given sequences.
     :param out_csv: path of the out Dataframe summarizing all telomeric regions found.
+    :param mer_size: size of telomere motif
+    :param size_window: size of the sliding window for the calculation of the score average
+    :param min_mean_window: minimum average score of a telomere window
+    :param min_mean_telo: minimum average score of a telomere
+    :param strain: strain / label name
+    :param max_dist_term: maximal distance from the extremity to be considered as terminal
+    :param max_size_gap: maximum size of a non telomeric gap in telomere
+    :param min_len : minimum length of a telomere
     '''
     dfTelo=pd.DataFrame(columns=['strain','name','N','type','len','start','end','Loc','Score_Kmer','reads_len'])
     for file,typ in ((fileCKmer,'C'),(fileGKmer,'G')):
@@ -387,7 +406,7 @@ def Find_Telo_on_Kmer(original_fasta,out_fasta,fileCKmer,fileGKmer,out_csv):
         for l in f :
             if l[0]=='>':
                 if seq != '':
-                    dfTelo=Eval_One_Read(dfTelo,nam,seq,typ,score)
+                    dfTelo=Eval_One_Read(dfTelo,nam,seq,typ,score,mer_size,size_window,min_mean_window,min_mean_telo,strain,max_dist_term,max_size_gap,min_len)
                 nam = l[1:-1]
                 seq=''
                 score=''
@@ -395,17 +414,17 @@ def Find_Telo_on_Kmer(original_fasta,out_fasta,fileCKmer,fileGKmer,out_csv):
                 score+=l.split(' ')[-1].strip('\n')
             else : 
                 seq+=l[:-1]
-        dfTelo=Eval_One_Read(dfTelo,nam,seq,typ,score)
+        dfTelo=Eval_One_Read(dfTelo,nam,seq,typ,score,mer_size,size_window,min_mean_window,min_mean_telo,strain,max_dist_term,max_size_gap,min_len)
     dfTelo=Add_N(dfTelo)
     dfTelo.index.name = 'index'
-    dfTelo.to_csv(out_csv,sep='\t',index=False)
+    dfTelo.to_csv(out_csv,sep=',',index=False)
     Make_Fasta_Telo_Complet_dfTelo(dfTelo,out_fasta,original_fasta)
 
-def process_fasta(original_fasta, fileCKmer, fileGKmer, out_fasta, out_csv):
+def process_fasta(original_fasta, fileCKmer, fileGKmer, out_fasta, out_csv, mer_size,Tab_score,size_window,min_mean_window,min_mean_telo,strain,max_dist_term,max_size_gap,min_len):
     print('Run '+original_fasta)
-    Fasta_to_Kmertype(original_fasta, fileCKmer, 'C')
-    Fasta_to_Kmertype(original_fasta, fileGKmer, 'G')
-    Find_Telo_on_Kmer(original_fasta, out_fasta, fileCKmer, fileGKmer, out_csv)
+    Fasta_to_Kmertype(original_fasta, fileCKmer, 'C', mer_size,Tab_score)
+    Fasta_to_Kmertype(original_fasta, fileGKmer, 'G', mer_size,Tab_score)
+    Find_Telo_on_Kmer(original_fasta, out_fasta, fileCKmer, fileGKmer, out_csv,mer_size,size_window,min_mean_window,min_mean_telo,strain,max_dist_term,max_size_gap,min_len)
     os.remove(original_fasta)
     os.remove(fileCKmer)
     os.remove(fileGKmer)
@@ -450,9 +469,7 @@ if __name__ == "__main__":
             out_pwd='./'
         if out_pwd[-1]!='/':
             out_pwd+='/'
-
-
-    
+            
     print("strain : ",strain, 
     "\n fastafile : ",fastafile,
     "\n motif: ",motif,
@@ -496,7 +513,7 @@ if __name__ == "__main__":
             fileGKmer = f"{temp_files}{fasta_file.rsplit('.',1)[0]+'_G.kmer.txt'}"
             out_fasta = f"{temp_files}{fasta_file}_out.fasta"
             out_csv = f"{temp_files}{fasta_file.rsplit('.',1)[0]+'_out.csv'}"
-            futures.append(executor.submit(process_fasta, split_location+fasta_file, fileCKmer, fileGKmer, out_fasta, out_csv))
+            futures.append(executor.submit(process_fasta, split_location+fasta_file, fileCKmer, fileGKmer, out_fasta, out_csv, mer_size, Tab_score,size_window,min_mean_window,min_mean_telo,strain,max_dist_term,max_size_gap,min_len))
         # Attendre la fin de toutes les tâches
         concurrent.futures.wait(futures)
 
