@@ -9,7 +9,7 @@ import os
 import concurrent.futures
 import subprocess
 import re
-
+from pathlib import Path
 
 start_time = time.time()
 
@@ -489,7 +489,7 @@ if __name__ == "__main__":
     temp_files = out_pwd+"temp_files/"
     os.makedirs(temp_files, exist_ok=True)
 
-    Tab_score=pd.read_csv(f'Motif_Score_Table/Score_for_'+args.motif+'.tab',sep='\t',index_col='Mer')
+    Tab_score=pd.read_csv(f"{Path(__file__).resolve().parent}/Motif_Score_Table/Score_for_{args.motif}.tab",sep='\t',index_col='Mer')
 
     nb_seq = int(subprocess.check_output(f"grep -c '^>' {os.path.join(pwd, fastafile)}", shell=True))
     if nb_seq <= max_split_seq:
