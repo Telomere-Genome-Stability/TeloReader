@@ -98,6 +98,9 @@ def parse_arguments():
 def Make_reverse(seq):
     '''
     Takes sequence and returns the reverse complement 
+
+    :param seq: a nucleotide sequence
+    :return: the reverse sequence
     '''
     rev={'A':'T','T':'A','C':'G','G':'C'}
     rseq=''
@@ -113,6 +116,7 @@ def Fasta_to_Kmertype(fasta,fileKmer,typ,mer_size,Tab_score):
     :param fasta: path to input fasta file
     :param fileKmer: path to output K-mer score file
     :param typ: type of scoring system ('C' for C-rich or 'G' for G-rich)
+    :param mer_size: size of telomere motif
     :param Tab_score: table of K-mer score
     '''
     f=open(fasta,'r')
@@ -223,8 +227,8 @@ def Eval_One_Read(dfTelo,nam,seq,typ,score,mer_size,size_window,min_mean_window,
     :param min_len : minimum length of a telomere
     :returns dfTelo: the updated Pandas DataFrame with the telomeric regions added
     '''
-    #Checks if 7 or 8 is in score, which may indicate the presence of a telomeric repeat.  If this is not the case, the function does not execute the rest of the code.
-    if str(mer_size) in score :#or str(mer_size-1) in score :
+    #At least one perfect telomeric motif. If this is not the case, the function does not execute the rest of the code.
+    if str(np.base_repr(mer_size,36)) in score :
         telo=0 
         i=0
         start_gap=''
@@ -239,7 +243,7 @@ def Eval_One_Read(dfTelo,nam,seq,typ,score,mer_size,size_window,min_mean_window,
             ind_d=range(len(decision))
         while i < len(score): # if we reach the end of the read
             if telo == 0 :
-                if score[ind_score[i]] in [str(mer_size)] :#[str(mer_size-1),str(mer_size)] : # if the quality score is 7 or 8, start a new telomeric region
+                if score[ind_score[i]] in [str(np.base_repr(mer_size,36))] :
                     telo=1
                     start=ind_score[i]
                 i+=1
@@ -247,29 +251,29 @@ def Eval_One_Read(dfTelo,nam,seq,typ,score,mer_size,size_window,min_mean_window,
                 if i >= len(decision): # if we are close to the end of the sequence
                     if typ == 'G':
                         score_telo = score[:start+1]
-                        while score_telo[0] not in  [str(mer_size)] or np.mean([int(k) for k in score_telo]) < min_mean_telo: #str(mer_size-1),
+                        while score_telo[0] not in  [str(np.base_repr(mer_size,36))] or np.mean([int(k,36) for k in score_telo]) < min_mean_telo: #str(mer_size-1),
                             score_telo=score_telo[1:]
-                        # removes the first or/and the last nucleotide at the boundaries, when transitioning from a 8 to 7 score
-                        if len(score_telo)>1 and  score_telo[-1]==str(mer_size-1) and score_telo[-2]==str(mer_size):#
+                        # removes the first or/and the last nucleotide at the boundaries, when transitioning from a mer_size to mer_size-1 score
+                        if len(score_telo)>1 and  score_telo[-1]==str(np.base_repr(mer_size-1,36)) and score_telo[-2]==str(np.base_repr(mer_size,36)):
                             start-=1
                             score_telo=score_telo[:-1]
                         end=start+mer_size
-                        if len(score_telo)>1 and score_telo[0]==str(mer_size-1)  and score_telo[1]==str(mer_size):
+                        if len(score_telo)>1 and score_telo[0]==str(np.base_repr(mer_size-1,36))  and score_telo[1]==str(np.base_repr(mer_size,36)):
                             score_telo=score_telo[1:]
                         start=max(0,end - len(score_telo)- mer_size + 1)
                     else : 
                         score_telo = score[start:]
-                        while score_telo[-1] not in [str(mer_size-1),str(mer_size)] or np.mean([int(k) for k in score_telo]) < min_mean_telo :
+                        while score_telo[-1] not in [str(np.base_repr(mer_size-1,36)),str(np.base_repr(mer_size,36))] or np.mean([int(k,36) for k in score_telo]) < min_mean_telo :
                             score_telo=score_telo[:-1]
-                        # removes the first or/and the last nucleotide at the boundaries, when transitioning from a 8 to 7 score 
-                        if len(score_telo)>1 and score_telo[0] ==str(mer_size-1) and score_telo[1]==str(mer_size):
+                        # removes the first or/and the last nucleotide at the boundaries, when transitioning from a mer_size to mer_size-1 score
+                        if len(score_telo)>1 and score_telo[0] ==str(np.base_repr(mer_size-1,36)) and score_telo[1]==str(np.base_repr(mer_size,36)):
                             start+=1
                             score_telo=score_telo[1:]
                         end=min(start+len(score_telo)-1,len(score)-1)+mer_size
-                        if len(score_telo)>1 and score_telo[-1]==str(mer_size-1) and score_telo[-2]==str(mer_size):
+                        if len(score_telo)>1 and score_telo[-1]==str(np.base_repr(mer_size-1,36)) and score_telo[-2]==str(np.base_repr(mer_size,36)):
                             score_telo=score_telo[:-1]
-                    if len(score_telo)+mer_size> min_len and score_telo.count(str(mer_size))>=mer_size:
-                        dfTelo = Add_Telo(dfTelo,nam,start,end,typ,len(seq),np.mean([int(k) for k in score_telo]),strain,max_dist_term)
+                    if len(score_telo)+mer_size> min_len and score_telo.count(str(np.base_repr(mer_size,36)))>=mer_size:
+                        dfTelo = Add_Telo(dfTelo,nam,start,end,typ,len(seq),np.mean([int(k,36) for k in score_telo]),strain,max_dist_term)
                     i=len(score) 
                 elif decision[ind_d[i]] == 1: # if decision is 1, telomeric stretch continues
                     i+=1
@@ -277,10 +281,10 @@ def Eval_One_Read(dfTelo,nam,seq,typ,score,mer_size,size_window,min_mean_window,
                     if start_gap != '': # if there is already a gap in the telomeric stretch
                         # Verifies if the previous gap is accepted, depending on the mean of telomeric stretch up to the current position before the new gap.
                         if typ == 'G':
-                            if np.mean([int(k) for k in score[max(ind_score[i]-size_window+mer_size,0):start+1]]) < min_mean_telo :
+                            if np.mean([int(k,36) for k in score[max(ind_score[i]-size_window+mer_size,0):start+1]]) < min_mean_telo :
                                 telo=0
                         else :
-                            if np.mean([int(k) for k in score[start:min(ind_score[i]+size_window-mer_size,len(score))+1]]) < min_mean_telo :
+                            if np.mean([int(k,36) for k in score[start:min(ind_score[i]+size_window-mer_size,len(score))+1]]) < min_mean_telo :
                                 telo=0
                     if telo==1 : # if the previous gap is accepted, verifies if the new gap is tested
                         start_gap=ind_score[i]
@@ -293,13 +297,13 @@ def Eval_One_Read(dfTelo,nam,seq,typ,score,mer_size,size_window,min_mean_window,
                 if telo == 0 :
                     if typ == 'G':
                         score_telo = score[max(0,start_gap-size_window+mer_size):start+1]
-                        while score_telo[0] not in  [str(mer_size-1),str(mer_size)] or np.mean([int(k) for k in score_telo]) < min_mean_telo: 
+                        while score_telo[0] not in  [str(np.base_repr(mer_size-1,36)),str(np.base_repr(mer_size,36))] or np.mean([int(k,36) for k in score_telo]) < min_mean_telo: 
                             score_telo=score_telo[1:]
                         # removes the first or/and the last nucleotide at the boundaries, when transitioning from a 8 to 7 score 
-                        if len(score_telo)>1 and  score_telo[-1]==str(mer_size-1) and score_telo[-2]==str(mer_size):
+                        if len(score_telo)>1 and  score_telo[-1]==str(np.base_repr(mer_size-1,36)) and score_telo[-2]==str(np.base_repr(mer_size,36)):
                             start-=1
                             score_telo=score_telo[:-1]
-                        if len(score_telo)>1 and score_telo[0]==str(mer_size-1) and score_telo[1]==str(mer_size):
+                        if len(score_telo)>1 and score_telo[0]==str(np.base_repr(mer_size-1,36)) and score_telo[1]==str(np.base_repr(mer_size,36)):
                             score_telo=score_telo[1:]
                         end=start+mer_size
                         start=max(0,end - len(score_telo)- mer_size + 1)
@@ -309,21 +313,21 @@ def Eval_One_Read(dfTelo,nam,seq,typ,score,mer_size,size_window,min_mean_window,
                     else : 
                         score_telo = score[start:min(start_gap+size_window-mer_size,len(score))+1]
                         j=min(len(score_telo)-(start_gap-start),len(score_telo))+1
-                        while score_telo[-1] not in  [str(mer_size-1),str(mer_size)] or np.mean([int(k) for k in score_telo]) < min_mean_telo :
+                        while score_telo[-1] not in  [str(np.base_repr(mer_size-1,36)),str(np.base_repr(mer_size,36))] or np.mean([int(k,36) for k in score_telo]) < min_mean_telo :
                             score_telo=score_telo[:-1]
 
 
-                        if len(score_telo)>1 and score_telo[0] ==str(mer_size-1) and score_telo[1]==str(mer_size):
+                        if len(score_telo)>1 and score_telo[0] ==str(np.base_repr(mer_size-1,36)) and score_telo[1]==str(np.base_repr(mer_size,36)):
                             start+=1
                             score_telo=score_telo[1:]
-                        if len(score_telo)>1 and score_telo[-1]==str(mer_size-1) and score_telo[-2]==str(mer_size):
+                        if len(score_telo)>1 and score_telo[-1]==str(np.base_repr(mer_size-1,36)) and score_telo[-2]==str(np.base_repr(mer_size,36)):
                             score_telo=score_telo[:-1]
                         end=min(start+len(score_telo),len(score)-1)+mer_size-1
                         i=ind_seq.index(end)
                     start_gap=''
                     # Check if there are at least three scores of 8 in the telomere
-                    if len(score_telo)+mer_size> min_len and score_telo.count(str(mer_size))>=mer_size :
-                        dfTelo = Add_Telo(dfTelo,nam,start,end,typ,len(seq),np.mean([int(k) for k in score_telo]),strain,max_dist_term)
+                    if len(score_telo)+mer_size> min_len and score_telo.count(str(np.base_repr(mer_size,36)))>=mer_size :
+                        dfTelo = Add_Telo(dfTelo,nam,start,end,typ,len(seq),np.mean([int(k,36) for k in score_telo]),strain,max_dist_term)
     return(dfTelo)
 
 def Add_N(dfTelo):
@@ -342,8 +346,8 @@ def Make_Fasta_Telo_Complet_dfTelo(csv,fasta,original_fasta):
     Creates a fasta file with all telomeric regions and adds telomeric lengths in csv. 
 
     :param csv: DataFrame (dfTelo) with all telomeric region found
-    :fasta: path of the new created fasta file with all telomeric regions
-    :original_fasta: path of original fasta file with all sequences
+    :param fasta: path of the new created fasta file with all telomeric regions
+    :param original_fasta: path of original fasta file with all sequences
     :return :updated DataFrame with read lengths 
     '''
     foriginal=open(original_fasta,'r')
@@ -410,17 +414,38 @@ def Find_Telo_on_Kmer(original_fasta,out_fasta,fileCKmer,fileGKmer,out_csv,mer_s
                 nam = l[1:-1]
                 seq=''
                 score=''
-            elif l.split(' ')[-1][0] in [str(k) for k in range(int(mer_size/2),mer_size+1)]:
+                s=0
+            elif s==1:
                 score+=l.split(' ')[-1].strip('\n')
+                s=0
             else : 
                 seq+=l[:-1]
+                s=1
         dfTelo=Eval_One_Read(dfTelo,nam,seq,typ,score,mer_size,size_window,min_mean_window,min_mean_telo,strain,max_dist_term,max_size_gap,min_len)
     dfTelo=Add_N(dfTelo)
     dfTelo.index.name = 'index'
-    dfTelo.to_csv(out_csv,sep=',',index=False)
+    dfTelo.to_csv(out_csv,sep='\t',index=False)
     Make_Fasta_Telo_Complet_dfTelo(dfTelo,out_fasta,original_fasta)
 
 def process_fasta(original_fasta, fileCKmer, fileGKmer, out_fasta, out_csv, mer_size,Tab_score,size_window,min_mean_window,min_mean_telo,strain,max_dist_term,max_size_gap,min_len):
+    '''
+    This function executes the different functions on a fasta file to obtain output results.
+
+    :param original_fasta: path of original fasta file with all sequences
+    :param fileCKmer: path of the file created with the function Fasta_to_Kmertype with C-rich Kmer scores of given sequences.
+    :param fileGKmer: path of the file created with the function Fasta_to_Kmertype with G-rich Kmer scores of given sequences.
+    :param out_fasta: path of the new created fasta file with all telomeric regions
+    :param out_csv: path of the out Dataframe summarizing all telomeric regions found.
+    :param mer_size: size of telomere motif
+    :param Tab_score: table of K-mer score
+    :param size_window: size of the sliding window for the calculation of the score average
+    :param min_mean_window: minimum average score of a telomere window
+    :param min_mean_telo: minimum average score of a telomere
+    :param strain: strain / label name
+    :param max_dist_term: maximal distance from the extremity to be considered as terminal
+    :param max_size_gap: maximum size of a non telomeric gap in telomere
+    :param min_len : minimum length of a telomere
+    '''
     print('Run '+original_fasta)
     Fasta_to_Kmertype(original_fasta, fileCKmer, 'C', mer_size,Tab_score)
     Fasta_to_Kmertype(original_fasta, fileGKmer, 'G', mer_size,Tab_score)
@@ -469,7 +494,7 @@ if __name__ == "__main__":
             out_pwd='./'
         if out_pwd[-1]!='/':
             out_pwd+='/'
-            
+
     print("strain : ",strain, 
     "\n fastafile : ",fastafile,
     "\n motif: ",motif,
@@ -488,6 +513,7 @@ if __name__ == "__main__":
     os.makedirs(out_pwd, exist_ok=True)
     temp_files = out_pwd+"temp_files/"
     os.makedirs(temp_files, exist_ok=True)
+
 
     Tab_score=pd.read_csv(f"{Path(__file__).resolve().parent}/Motif_Score_Table/Score_for_{args.motif}.tab",sep='\t',index_col='Mer')
 
@@ -514,7 +540,7 @@ if __name__ == "__main__":
             out_fasta = f"{temp_files}{fasta_file}_out.fasta"
             out_csv = f"{temp_files}{fasta_file.rsplit('.',1)[0]+'_out.csv'}"
             futures.append(executor.submit(process_fasta, split_location+fasta_file, fileCKmer, fileGKmer, out_fasta, out_csv, mer_size, Tab_score,size_window,min_mean_window,min_mean_telo,strain,max_dist_term,max_size_gap,min_len))
-        # Attendre la fin de toutes les tâches
+        # Wait for all tasks to finish
         concurrent.futures.wait(futures)
 
 
